@@ -126,7 +126,8 @@ void *moderator(void *args) {
             pthread_mutex_lock(&done_speaking_mutex[commentatorID]);
             while(!finished_speaking[commentatorID]) {
                 pthread_cond_wait(&done_speaking[commentatorID], &done_speaking_mutex[commentatorID]);
-            }                    
+            }
+            finished_speaking[commentatorID] = false;                    
             pthread_mutex_unlock(&done_speaking_mutex[commentatorID]);
         }
         pthread_mutex_unlock(&answering_queue_mutex);
@@ -171,13 +172,14 @@ void *commentator(int commentatorID) {
             while(!may_i_speak[commentatorID]) {
                 pthread_cond_wait(&permission_to_speak[commentatorID], &permission_to_speak_mutex[commentatorID]);                
             }
+            may_i_speak[commentatorID] = false;
             pthread_mutex_unlock(&permission_to_speak_mutex[commentatorID]);
             float speaking_time = calculate_speaking_time();                       
             printf(" Commentator #%d 's turn to speak for %f seconds for question #%d\n", commentatorID, speaking_time, i+1);
             pthread_sleep(speaking_time);
             pthread_mutex_lock(&done_speaking_mutex[commentatorID]);
             finished_speaking[commentatorID] = true;
-            pthread_mutex_unlock(&done_speaking_mutex[commentatorID]);
+            pthread_mutex_unlock(&done_speaking_mutex[commentatorID]);            
             pthread_cond_signal(&done_speaking[commentatorID]);
         }
     }
