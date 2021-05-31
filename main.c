@@ -3,10 +3,14 @@
 #include <pthread.h>
 #include <time.h>
 #include <semaphore.h>
-#define MAX_NUMBER_OF_THREADS = 1000
+#include <unistd.h> 
+#include <getopt.h>
+#define MAX_NUMBER_OF_THREADS 1000
 
 pthread_t threads[MAX_NUMBER_OF_THREADS] = {0};
 
+
+float b;  
 float p;
 int q;
 int n;
@@ -69,8 +73,32 @@ void* commentator(int commentatorID) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    int opt;
+
+    while((opt = getopt(argc, argv, "n:p:q:t:b:")) != -1)  // parsing the input 
+    { 
+        switch(opt) 
+        { 
+            case 'n':
+                n = atoi(optarg);
+
+            case 'p': 
+                p = atof(optarg);
+
+            case 'q': 
+                q = atoi(optarg);
+            case 't': 
+                t = atof(optarg);
+            case 'b': 
+                b = atof(optarg);
+                
+    
+        } 
+    } 
+
     answering_queue = createQueue(number_of_commentators);
+
 }
 
 /**
