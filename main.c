@@ -287,7 +287,7 @@ int main() {
     q = 5;
     number_of_commentators = 4;
     t = 3;
-    b = 0.5;
+    b = 0.2;
     answering_queue = createQueue(number_of_commentators);
     current_question = -1;
     gettimeofday(&start_time, NULL);
@@ -401,7 +401,7 @@ int main() {
 //   https://stackoverflow.com/questions/6218399/how-to-generate-a-random-number-between-0-and-1/6219525
 
 bool decide_to_answer_or_not() {
-    float random_probability = random() / RAND_MAX;
+    float random_probability = (float)random() / (float)RAND_MAX;
     if (random_probability < p) {
         return true;
     } else {
@@ -419,7 +419,8 @@ float calculate_speaking_time() {
 }
 
 bool calculate_breaking_news_event() {
-    float random_probability = random() / RAND_MAX;
+    float random_probability = (float)random() / (float)RAND_MAX;
+    printf("%s %f \n", gettimestamp(), random_probability);
     if (random_probability < b) {
         return true;
     } else {
