@@ -45,7 +45,7 @@ int current_question = 0;
 // Functions
 int pthread_sleep(double seconds);
 bool decide_to_answer_or_not();
-float calculate_speaking_time();
+double calculate_speaking_time();
 bool calculate_breaking_news_event();
 char *gettimestamp() {
     struct timeval tp;
@@ -57,6 +57,49 @@ char *gettimestamp() {
         ms += 1000;
     sprintf(currentTime, "[%02d:%02d.%03d]", m, s, ms);
     return currentTime;
+}
+
+int utc_system_timestamp(char[], float);
+int utc_system_timestamp_now(char[]);
+
+/*
+struct timespec timeToWait;
+            struct timeval now;            
+            gettimeofday(&now,NULL);
+            timeToWait.tv_sec = now.tv_sec+speaking_time; 
+            timeToWait.tv_nsec = now.tv_usec * 1000;
+            char buffer[31];
+            utc_system_timestamp(buffer);
+
+*/
+
+// Allocate exactly 31 bytes for buf
+int utc_system_timestamp(char buf[], float speaking_time) {
+    const int bufsize = 31;
+    const int tmpsize = 21;
+    struct timespec now;
+    struct timespec timeToWait;
+    struct tm tm;
+    int retval = clock_gettime(CLOCK_REALTIME, &now);
+    timeToWait.tv_sec = now.tv_sec + speaking_time;
+    timeToWait.tv_nsec = now.tv_nsec * 1000;
+    gmtime_r(&timeToWait.tv_sec, &tm);
+    strftime(buf, tmpsize, "%Y-%m-%dT%H:%M:%S.", &tm);
+    sprintf(buf + tmpsize -1, "%09luZ", timeToWait.tv_nsec);
+    return retval;
+}
+
+
+int utc_system_timestamp_now(char buf[]) {
+    const int bufsize = 31;
+    const int tmpsize = 21;
+    struct timespec now;
+    struct tm tm;
+    int retval = clock_gettime(CLOCK_REALTIME, &now);
+    gmtime_r(&now.tv_sec, &tm);
+    strftime(buf, tmpsize, "%Y-%m-%dT%H:%M:%S.", &tm);
+    sprintf(buf + tmpsize -1, "%09luZ", now.tv_nsec);
+    return retval;
 }
 //---------------------------------------------
 
@@ -138,6 +181,7 @@ pthread_mutex_t breaking_news_event_happening_mutex;
 bool is_breaking_news_event_ended = false;
 pthread_cond_t breaking_news_event_ended;
 pthread_mutex_t breaking_news_event_ended_mutex;
+
 //---------------------------------------------
 
 void *moderator(void *args) {
@@ -165,12 +209,12 @@ void *moderator(void *args) {
         while(answering_queue->size > 0) {            
             pthread_mutex_lock(&breaking_news_event_happening_mutex);
             if (!is_breaking_news_event_happening) {
-                printf("%s In Moderator, breaking news event NOT happening\n", gettimestamp());
+                // printf("%s In Moderator, breaking news event NOT happening\n", gettimestamp());
                 pthread_mutex_unlock(&breaking_news_event_happening_mutex);
                 int commentatorID = dequeue(answering_queue);
                 pthread_mutex_lock(&permission_to_speak_mutex[commentatorID]);
                 may_i_speak[commentatorID] = true;
-                printf("%s Moderator gives permission to Commentator #%d to speak for the question #%d\n", gettimestamp(), commentatorID, i+1);
+                // printf("%s Moderator gives permission to Commentator #%d to speak for the question #%d\n", gettimestamp(), commentatorID, i+1);
                 pthread_mutex_unlock(&permission_to_speak_mutex[commentatorID]);
                 pthread_cond_signal(&permission_to_speak[commentatorID]);
                 pthread_mutex_lock(&done_speaking_mutex[commentatorID]);
@@ -180,10 +224,10 @@ void *moderator(void *args) {
                 finished_speaking[commentatorID] = false;                    
                 pthread_mutex_unlock(&done_speaking_mutex[commentatorID]);
             } else {
-                printf("%s In Moderator, breaking news event happening before giving any permission!!\n", gettimestamp());
+                // printf("%s In Moderator, breaking news event happening before giving any permission!!\n", gettimestamp());
                 pthread_mutex_unlock(&breaking_news_event_happening_mutex);
                 pthread_mutex_lock(&breaking_news_event_ended_mutex);
-                printf("%s Waiting for the breaking news event to finish before giving any permission\n", gettimestamp());
+                // printf("%s Waiting for the breaking news event to finish before giving any permission\n", gettimestamp());
                 while(!is_breaking_news_event_ended) {                    
                     pthread_cond_wait(&breaking_news_event_ended, &breaking_news_event_ended_mutex);
                 }
@@ -224,7 +268,7 @@ void *commentator(int commentatorID) {
             printf("%s Commentator with ID %d does not want to answer \n", gettimestamp(), commentatorID);            
         }               
         if (number_of_decided_commentators == number_of_commentators) {            
-            printf("%s All commentators decided to answer or not for question #%d\n", gettimestamp(), i+1);
+            // printf("%s All commentators decided to answer or not for question #%d\n", gettimestamp(), i+1);
             pthread_mutex_lock(&all_commentators_decided_mutex_array[i]);
             has_all_commentators_decided_array[i] = true;
             pthread_mutex_unlock(&all_commentators_decided_mutex_array[i]);                  
@@ -240,20 +284,22 @@ void *commentator(int commentatorID) {
             may_i_speak[commentatorID] = false;
             pthread_mutex_unlock(&permission_to_speak_mutex[commentatorID]);
             pthread_mutex_lock(&breaking_news_event_happening_mutex);
-            float speaking_time = calculate_speaking_time();         
-            struct timespec timeToWait;
-            struct timeval now;            
-            gettimeofday(&now,NULL);
-            timeToWait.tv_sec = now.tv_sec+speaking_time; 
-            timeToWait.tv_nsec = now.tv_usec * 1000;
-            printf("%s Commentator #%d 's turn to speak for %f seconds for question #%d\n", gettimestamp(), commentatorID, speaking_time, i+1);                                    
-            int res = pthread_cond_timedwait(&breaking_news_event_happening, &breaking_news_event_happening_mutex, &timeToWait);            
+            double speaking_time = calculate_speaking_time();    
+            struct timeval tp;
+            struct timespec timetoexpire;
+            gettimeofday(&tp, NULL);
+            long new_nsec = tp.tv_usec * 1000 + (speaking_time - (long)speaking_time) * 1e9;
+            timetoexpire.tv_sec = tp.tv_sec + (long)speaking_time + (new_nsec / (long)1e9);
+            timetoexpire.tv_nsec = new_nsec % (long)1e9;
+            printf("%s Commentator #%d 's turn to speak for %f seconds for question #%d\n", gettimestamp(), commentatorID, speaking_time, i+1);                                                               
+            int res = pthread_cond_timedwait(&breaking_news_event_happening, &breaking_news_event_happening_mutex, &timetoexpire);            
             if (res == 0) {
                 printf("%s Commentator #%d is cut short due to a breaking news\n", gettimestamp(), commentatorID);
-            }
+            } else {
+                printf("%s Commentator #%d finished speaking\n", gettimestamp(), commentatorID);
+            }            
             pthread_mutex_unlock(&breaking_news_event_happening_mutex);
             pthread_sleep(speaking_time);
-            // printf("%s ANANIN AMI DİDEM\n", gettimestamp());
             pthread_mutex_lock(&done_speaking_mutex[commentatorID]);
             finished_speaking[commentatorID] = true;
             pthread_mutex_unlock(&done_speaking_mutex[commentatorID]);            
@@ -355,42 +401,46 @@ int main() {
     printf("%s Every thread is created\n", gettimestamp());
 
     while(true) {        
+        pthread_mutex_lock(&is_program_over_mutex);
+        if (is_questions_over) {
+            break;
+        }
+        pthread_mutex_unlock(&is_program_over_mutex);
         pthread_mutex_lock(&breaking_news_event_happening_mutex);
         is_breaking_news_event_happening = calculate_breaking_news_event();   
         if (is_breaking_news_event_happening) {
+            // printf("%s Breaking news event happening in Main thread\n", gettimestamp());
             pthread_mutex_lock(&breaking_news_event_ended_mutex);
             is_breaking_news_event_ended = false;
             pthread_mutex_unlock(&breaking_news_event_ended_mutex);            
-            printf("%s in Main breaking news event happening is triggered\n", gettimestamp());
+            // printf("%s in Main breaking news event happening is triggered\n", gettimestamp());
             pthread_mutex_unlock(&breaking_news_event_happening_mutex);
             pthread_cond_broadcast(&breaking_news_event_happening);        
             pthread_sleep(5);
+            pthread_mutex_lock(&breaking_news_event_ended_mutex);
             pthread_mutex_lock(&breaking_news_event_happening_mutex);
             is_breaking_news_event_happening = false;
-            pthread_mutex_unlock(&breaking_news_event_happening_mutex);            
-            printf("%s in Main, after waited 5 seconds for the breaking news event\n", gettimestamp());
-            pthread_mutex_lock(&breaking_news_event_ended_mutex);
             is_breaking_news_event_ended = true;
+            pthread_mutex_unlock(&breaking_news_event_happening_mutex);            
+            // printf("%s in Main, after waited 5 seconds for the breaking news event\n", gettimestamp());
+            
+            
             pthread_mutex_unlock(&breaking_news_event_ended_mutex);
             pthread_cond_broadcast(&breaking_news_event_ended);
-            printf("%s in Main, breaking news event is ended\n", gettimestamp());
+            // printf("%s in Main, breaking news event is ended\n", gettimestamp());
         } else {
             pthread_mutex_unlock(&breaking_news_event_happening_mutex);
-            printf("%s NO BREAKING EVENT\n", gettimestamp());
-            pthread_mutex_lock(&is_program_over_mutex);
-            if (is_questions_over) {
-                break;
-            }
-            pthread_mutex_unlock(&is_program_over_mutex);                                           
+            // printf("%s NO BREAKING EVENT\n", gettimestamp());
         }   
         pthread_sleep(1);              
     }
     pthread_mutex_unlock(&is_program_over_mutex); 
     printf("Moderator asked all questions. Preparing to terminate\n");
     printf("Main pthread join\n");    
-    for (int i = 0; i < number_of_commentators + 2; i++) {
+    for (int i = 0; i < number_of_commentators + 1; i++) {
         pthread_join(threads[i], NULL);
     }        
+    pthread_cancel(threads[number_of_commentators+1]);
     printf("Program is over\n");
     
 }
@@ -413,14 +463,13 @@ bool decide_to_answer_or_not() {
 // Random float generation between 1 and t is taken from Stackoverflow
 // the link is
 //   https://stackoverflow.com/questions/17846212/generate-a-random-number-between-1-and-10-in-c
-float calculate_speaking_time() {
-    float speak_time = (float)random() / (float)(RAND_MAX / t);
+double calculate_speaking_time() {
+    double speak_time = (double)random() / (double)(RAND_MAX / t);
     return speak_time;
 }
 
 bool calculate_breaking_news_event() {
     float random_probability = (float)random() / (float)RAND_MAX;
-    printf("%s %f \n", gettimestamp(), random_probability);
     if (random_probability < b) {
         return true;
     } else {
