@@ -185,7 +185,10 @@ pthread_mutex_t breaking_news_event_ended_mutex;
 //---------------------------------------------
 
 void *moderator(void *args) {
-    for (int i=0; i<q; i++) {        
+    for (int i=0; i<q; i++) {  
+        pthread_mutex_lock(&breaking_news_event_happening_mutex);
+        if (!is_breaking_news_event_happening) {
+            pthread_mutex_unlock(&breaking_news_event_happening_mutex);
         printf("--------------------------------------\n");
         printf("Question Number %d\n", i+1);        
         current_question = i;
@@ -235,7 +238,17 @@ void *moderator(void *args) {
             }
             
         }
-        pthread_mutex_unlock(&answering_queue_mutex);            
+        pthread_mutex_unlock(&answering_queue_mutex);
+        } else {
+            pthread_mutex_unlock(&breaking_news_event_happening_mutex);
+            pthread_mutex_lock(&breaking_news_event_ended_mutex);
+            while(!is_breaking_news_event_ended) {
+                pthread_cond_wait(&breaking_news_event_ended, &breaking_news_event_ended_mutex);
+            }
+            pthread_mutex_unlock(&breaking_news_event_ended_mutex);
+            i--;
+        }
+                    
     }
     pthread_mutex_lock(&is_program_over_mutex);
     is_questions_over = true;
