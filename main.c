@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <semaphore.h>
 #include <unistd.h>
+#include <getopt.h>
 #define MAX_NUMBER_OF_THREADS 1000
 #define MAX_QUESTIONS 1000
 
@@ -338,15 +339,30 @@ void *breaking_news_event_listener(void *args) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     printf("------------------------------------\n");
     printf("Starting program\n");    
     // Global variable initializer
-    p = 1.0;
-    q = 5;
-    number_of_commentators = 4;
-    t = 3;
-    b = 0.2;
+
+    int opt;
+
+    while((opt = getopt(argc, argv, "n:p:q:t:b:")) != -1)  // parsing the input 
+    { 
+        switch(opt) 
+        { 
+            case 'n':
+                number_of_commentators = atoi(optarg);
+            case 'p': 
+                p = atof(optarg);
+            case 'q': 
+                q = atoi(optarg);
+            case 't': 
+                t = atof(optarg);
+            case 'b': 
+                b = atof(optarg);                    
+        } 
+    } 
+
     answering_queue = createQueue(number_of_commentators);
     current_question = -1;
     gettimeofday(&start_time, NULL);
