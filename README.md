@@ -1,7 +1,7 @@
 # t_seconds_of_fame
 
 
-## Implementation
+## Implementation
 
 - We created is_this_question_asked boolean array, and question_asked condition variable array together with question_asked_mutex mutex array to guard the boolean variable array. The value of the boolean indicates for that index indicates that the moderator asked a new question.
 - We created bool has_all_commentators_decided_array boolean array, and all_commentators_decided_array condition variable array together with all_commentators_decided_mutex_array mutex array to guard the boolean variable. The value stored in that index indicates that the commentators decided to answer or not for the current question in that index. 
@@ -15,10 +15,10 @@
 - We used is_breaking_news_event_ended boolean varible to indicate that the previous breaking news event has ended. Since this value is also shared across all threads, we used breaking_news_event_ended condition and breaking_news_event_ended_mutex mutex to guard the value.
 
 
-## Description of Logics in Threads:
+## Description of Logics in Threads:
 
 
-### Main Thread:
+### Main Thread:
 - Parses the input taken from the user
 - Initializes the variables according to the given input
 - Initializes the variables we described above
@@ -28,7 +28,7 @@
 - If the questions are over, the main thread waits for other threads to finish
 
 
-### Moderator:
+### Moderator:
 - Checks whether there is currently a breaking news event
 - If there isn't any, it asks the new question and informs the commentators that the new question has been asked
 - It waits for commentators to decide to answer or not
