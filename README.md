@@ -1,5 +1,7 @@
 # t_seconds_of_fame
 
+This is a project demonstrating how to coordinate many threads using mutex locks and pthread_condition variables.
+The contributors are Tunaberk Almaci and Bümin Aybars İnci.
 
 ## Implementation
 
